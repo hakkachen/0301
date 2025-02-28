@@ -1,0 +1,31 @@
+name: Scheduled Job
+
+on:
+  #schedule:  #
+  #  - cron: '0 16 * * *' #   # 對應台灣時間的 00:00
+  workflow_dispatch:      # 添加這行以允許手動觸發
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+      
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'  # 使用 Python 3.x
+        
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+        
+    - name: Install aiohttp
+      run: pip install aiohttp  # 安裝 aiohttp 依賴
+
+    - name: Execute Script
+      run: |
+        python script.py  # 執行名為 script.py 的 Python 腳本

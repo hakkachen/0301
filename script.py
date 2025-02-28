@@ -5,10 +5,10 @@ requests.packages.urllib3.disable_warnings()
 import json
 import time
 
-pNo1 = "U120250301"
-line_notify_token = 'P2r0eM5lqbShPP9Nnzps3L4IGF5GddodiTseFbKVBkv'
-line_notify_api = 'https://notify-api.line.me/api/notify'
+# LINE Notify 訪問令牌
+LINE_NOTIFY_TOKEN = 'dAFSmsbnBxpaUqbYTShnSWL8yZ7f5iIzpoTD3w57e2b'
 
+# 帳號列表
 accounts = [
     ("門號1", {'ck_encust': '3202821113257996', 'isEN': '27f628244f185ab824e2161621ed06b2dfb9432d'}),
     ("門號2", {'ck_encust': '3202821183400259', 'isEN': '443a082ada6cded408011323b35d65eb70011fbf'}),
@@ -17,16 +17,36 @@ accounts = [
     ("門號5", {'ck_encust': '3201541209015560', 'isEN': '49af10540904497c1a8b6d9bdb6219811554754f'}),
 ]
 
-def line_notify(message):
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer ' + line_notify_token
-    }
-    payload = {'message': message}
-    response = requests.post(line_notify_api, headers=headers, data=payload)
-    return response.status_code
+# 定義活動編號和禮品碼
+m_promo_no = "M25030100017"
+dt_promo_no_array = [
+    "D25030100001"
+]
+gift_code_array = ["dumpling"]
 
-def sign_in_account(account, pNo):
+def send_line_notify(message):
+    headers = {
+        "Authorization": f"Bearer {LINE_NOTIFY_TOKEN}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    data = {"message": message}
+    try:
+        response = requests.post("https://notify-api.line.me/api/notify", headers=headers, data=data)
+        if response.status_code == 200:
+            print("LINE Notify 發送成功")
+        else:
+            print(f"LINE Notify 發送失敗: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"LINE Notify 發送失敗: {e}")
+
+def send_long_message(message):
+    max_length = 1000
+    while len(message) > 0:
+        send_line_notify(message[:max_length])
+        message = message[max_length:]
+        time.sleep(1)  # 避免發送過快，被限制
+
+def sign_in_account(account, m_promo_no, dt_promo_no, results):
     print("------------------------")
     t = time.localtime()
     time2 = time.strftime("%Y/%m/%d %H:%M:%S", t)
@@ -34,43 +54,42 @@ def sign_in_account(account, pNo):
 
     print("------------------------")
     print(f"帳號:{account[0]}")
-    print(f"ID:{pNo}")
+    print(f"ID:{account[1]['ck_encust']}")
 
     headers = {
-        'user-agent': 'MOMOSHOP',
+        'User-Agent': 'MOMOSHOP',
         'Content-Type': 'application/json;charset=utf-8',
         'Host': 'event.momoshop.com.tw',
         'Origin': 'https://www.momoshop.com.tw',
         'Referer': 'https://www.momoshop.com.tw/',
     }
 
-    cookies = requests.utils.cookiejar_from_dict(account[1])
-    data = {"pNo": pNo, "doAction": "taskFinished"}
-    r = requests.post('https://event.momoshop.com.tw/punch.PROMO', headers=headers, data=json.dumps(data), cookies=cookies)
-    task_finished_response = r.text
+    cookies = account[1]
 
-    data = {"pNo": pNo, "doAction": "reg"}
-    r = requests.post('https://event.momoshop.com.tw/punch.PROMO', headers=headers, data=json.dumps(data), cookies=cookies)
-    reg_response = r.text
-
-    data = {"pNo": pNo, "doAction": "sel"}
-    r = requests.post('https://event.momoshop.com.tw/punch.PROMO', headers=headers, data=json.dumps(data), cookies=cookies)
-    sel_response = r.text
-
+    json_data_lottery = {
+        "m_promo_no": m_promo_no,
+        "dt_promo_no": dt_promo_no,
+        'doAction': 'lottery',
+    }    
+    
+    try:
+        response = requests.post('https://event.momoshop.com.tw/game/momoLottery.PROMO', cookies=cookies, headers=headers, json=json_data_lottery)
+        print(response.text)
+        results.append(f"帳號:{account[0]} 抽獎結果: {response.text}")
+    except requests.exceptions.RequestException as e:
+        error_message = f"帳號:{account[0]} 抽獎動作失敗: {e}"
+        print(error_message)
+        results.append(error_message)
+    
     print("-----------------------")
-    
-    return f"帳號: {account[0]}\nID: {pNo}\nTask Finished Response: {task_finished_response}\nReg Response: {reg_response}\nSel Response: {sel_response}\nTime: {time2}\n"
 
-def send_long_message(message, chunk_size=1000):
-    for i in range(0, len(message), chunk_size):
-        line_notify(message[i:i+chunk_size])
-
-def main():
-    message = ""
+# 自動簽到
+results = []
+for _ in range(2):  # 這裡的循環會讓簽到動作執行兩次
     for account in accounts:
-        message += sign_in_account(account, pNo1) + "\n"
-    
-    send_long_message(message)
+        for dt_promo_no in dt_promo_no_array:
+            sign_in_account(account, m_promo_no, dt_promo_no, results)
 
-if __name__ == "__main__":
-    main()
+# 發送所有結果
+all_results_message = "\n".join(results)
+send_long_message(all_results_message)

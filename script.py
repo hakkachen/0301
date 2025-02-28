@@ -73,7 +73,7 @@ def sign_in_account(account, m_promo_no, dt_promo_no, results):
     }    
     
     try:
-        response = requests.post('https://event.momoshop.com.tw/game/momoLottery.PROMO', cookies=cookies, headers=headers, json=json_data_lottery)
+        response = requests.post('https://event.momoshop.com.tw/promoMechReg.PROMO', cookies=cookies, headers=headers, json=json_data_lottery)
         print(response.text)
         results.append(f"帳號:{account[0]} 抽獎結果: {response.text}")
     except requests.exceptions.RequestException as e:
@@ -85,7 +85,7 @@ def sign_in_account(account, m_promo_no, dt_promo_no, results):
 
 # 自動簽到
 results = []
-for _ in range(2):  # 這裡的循環會讓簽到動作執行兩次
+for _ in range(1):  # 這裡的循環會讓簽到動作執行兩次
     for account in accounts:
         for dt_promo_no in dt_promo_no_array:
             sign_in_account(account, m_promo_no, dt_promo_no, results)

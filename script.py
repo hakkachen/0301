@@ -4,6 +4,7 @@ import requests
 requests.packages.urllib3.disable_warnings()
 import json
 import time
+from itertools import product
 
 # LINE Notify 訪問令牌
 LINE_NOTIFY_TOKEN = 'dAFSmsbnBxpaUqbYTShnSWL8yZ7f5iIzpoTD3w57e2b'
@@ -19,9 +20,7 @@ accounts = [
 
 # 定義活動編號和禮品碼
 m_promo_no = "M25030100017"
-dt_promo_no_array = [
-    "D25030100001"
-]
+dt_promo_no_array = ["D25030100001"]
 gift_code_array = ["dumpling"]
 
 def send_line_notify(message):
@@ -46,7 +45,7 @@ def send_long_message(message):
         message = message[max_length:]
         time.sleep(1)  # 避免發送過快，被限制
 
-def sign_in_account(account, m_promo_no, dt_promo_no, results):
+def sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results):
     print("------------------------")
     t = time.localtime()
     time2 = time.strftime("%Y/%m/%d %H:%M:%S", t)
@@ -69,8 +68,9 @@ def sign_in_account(account, m_promo_no, dt_promo_no, results):
     json_data_lottery = {
         "m_promo_no": m_promo_no,
         "dt_promo_no": dt_promo_no,
+        "gift_code": gift_code,
         'doAction': 'lottery',
-    }    
+    }
     
     try:
         response = requests.post('https://event.momoshop.com.tw/promoMechReg.PROMO', cookies=cookies, headers=headers, json=json_data_lottery)
@@ -83,12 +83,14 @@ def sign_in_account(account, m_promo_no, dt_promo_no, results):
     
     print("-----------------------")
 
+# 確保 gift_code_array 不為空
+if not gift_code_array:
+    gift_code_array = ["default_code"]  # 預設禮品碼
+
 # 自動簽到
 results = []
-for _ in range(1):  # 這裡的循環會讓簽到動作執行兩次
-    for account in accounts:
-        for dt_promo_no in dt_promo_no_array:
-            sign_in_account(account, m_promo_no, dt_promo_no, results)
+for account, dt_promo_no, gift_code in product(accounts, dt_promo_no_array, gift_code_array):
+    sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results)
 
 # 發送所有結果
 all_results_message = "\n".join(results)

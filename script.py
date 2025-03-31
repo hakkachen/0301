@@ -19,9 +19,9 @@ accounts = [
 ]
 
 # 定義活動編號和禮品碼
-m_promo_no = "M25030100017"
-dt_promo_no_array = ["D25030100001"]
-gift_code_array = ["dumpling"]
+m_promo_no = "M25040100022"
+dt_promo_no_array = ["D25040100001"]
+gift_code_array = ["rice"]
 
 def send_line_notify(message):
     headers = {

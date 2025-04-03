@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import requests
-requests.packages.urllib3.disable_warnings()
 import json
 import time
 from itertools import product
 
-# LINE Notify 訪問令牌
-LINE_NOTIFY_TOKEN = 'dAFSmsbnBxpaUqbYTShnSWL8yZ7f5iIzpoTD3w57e2b'
+# Telegram Bot 設定
+TELEGRAM_BOT_TOKEN = "7795529893:AAHMUzaZHj4rVrG4rVF2fmdp6Hmln9wkQqU"
+TELEGRAM_CHAT_ID = "2060001903"  # 你的 Chat ID
 
 # 帳號列表
 accounts = [
@@ -18,34 +18,31 @@ accounts = [
     ("門號5", {'ck_encust': '3201541209015560', 'isEN': '49af10540904497c1a8b6d9bdb6219811554754f'}),
 ]
 
-# 定義活動編號和禮品碼
+# 活動編號與禮品碼
 m_promo_no = "M25040100022"
 dt_promo_no_array = ["D25040100001"]
 gift_code_array = ["rice"]
 
-def send_line_notify(message):
-    headers = {
-        "Authorization": f"Bearer {LINE_NOTIFY_TOKEN}",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    data = {"message": message}
+def send_telegram_message(message):
+    """發送訊息到 Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     try:
-        response = requests.post("https://notify-api.line.me/api/notify", headers=headers, data=data)
+        response = requests.post(url, json=data)
         if response.status_code == 200:
-            print("LINE Notify 發送成功")
+            print("Telegram 訊息發送成功")
         else:
-            print(f"LINE Notify 發送失敗: {response.status_code}")
+            print(f"Telegram 訊息發送失敗: {response.status_code}, {response.text}")
     except requests.exceptions.RequestException as e:
-        print(f"LINE Notify 發送失敗: {e}")
+        print(f"Telegram 發送失敗: {e}")
 
-def send_long_message(message):
-    max_length = 1000
-    while len(message) > 0:
-        send_line_notify(message[:max_length])
-        message = message[max_length:]
-        time.sleep(1)  # 避免發送過快，被限制
+def send_long_message(message, chunk_size=4096):
+    """避免訊息過長，Telegram 單則訊息最多 4096 字"""
+    for i in range(0, len(message), chunk_size):
+        send_telegram_message(message[i:i+chunk_size])
 
 def sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results):
+    """執行 momo 抽獎動作"""
     print("------------------------")
     t = time.localtime()
     time2 = time.strftime("%Y/%m/%d %H:%M:%S", t)
@@ -83,15 +80,19 @@ def sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results):
     
     print("-----------------------")
 
-# 確保 gift_code_array 不為空
-if not gift_code_array:
-    gift_code_array = ["default_code"]  # 預設禮品碼
+def main():
+    # 確保 gift_code_array 不為空
+    if not gift_code_array:
+        gift_code_array.append("default_code")  # 預設禮品碼
 
-# 自動簽到
-results = []
-for account, dt_promo_no, gift_code in product(accounts, dt_promo_no_array, gift_code_array):
-    sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results)
+    # 開始執行 momo 抽獎
+    results = []
+    for account, dt_promo_no, gift_code in product(accounts, dt_promo_no_array, gift_code_array):
+        sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results)
 
-# 發送所有結果
-all_results_message = "\n".join(results)
-send_long_message(all_results_message)
+    # 傳送抽獎結果
+    all_results_message = "\n".join(results)
+    send_long_message(all_results_message)
+
+if __name__ == "__main__":
+    main()

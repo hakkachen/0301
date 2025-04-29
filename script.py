@@ -1,15 +1,13 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
-import requests
+import aiohttp
+import asyncio
 import json
 import time
-from itertools import product
+import nest_asyncio
 
-# Telegram Bot 設定
-TELEGRAM_BOT_TOKEN = "7795529893:AAHMUzaZHj4rVrG4rVF2fmdp6Hmln9wkQqU"
-TELEGRAM_CHAT_ID = "2060001903"  # 你的 Chat ID
+# 應用 nest_asyncio 以允許嵌套事件循環
+nest_asyncio.apply()
 
-# 帳號列表
+# 帳號列表，包含門號與 cookies
 accounts = [
     ("門號1", {'ck_encust': '3202821113257996', 'isEN': '27f628244f185ab824e2161621ed06b2dfb9432d'}),
     ("門號2", {'ck_encust': '3202821183400259', 'isEN': '443a082ada6cded408011323b35d65eb70011fbf'}),
@@ -18,40 +16,12 @@ accounts = [
     ("門號5", {'ck_encust': '3201541209015560', 'isEN': '49af10540904497c1a8b6d9bdb6219811554754f'}),
 ]
 
-# 活動編號與禮品碼
-m_promo_no = "M25040100022"
-dt_promo_no_array = ["D25040100001"]
-gift_code_array = ["rice"]
+m_promo_no = "M25042300009"
+dt_promo_no_array = ["D25042300001"]
+gift_code_array = ["gift1"]
 
-def send_telegram_message(message):
-    """發送訊息到 Telegram"""
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    try:
-        response = requests.post(url, json=data)
-        if response.status_code == 200:
-            print("Telegram 訊息發送成功")
-        else:
-            print(f"Telegram 訊息發送失敗: {response.status_code}, {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Telegram 發送失敗: {e}")
-
-def send_long_message(message, chunk_size=4096):
-    """避免訊息過長，Telegram 單則訊息最多 4096 字"""
-    for i in range(0, len(message), chunk_size):
-        send_telegram_message(message[i:i+chunk_size])
-
-def sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results):
-    """執行 momo 抽獎動作"""
-    print("------------------------")
-    t = time.localtime()
-    time2 = time.strftime("%Y/%m/%d %H:%M:%S", t)
-    print(time2)
-
-    print("------------------------")
-    print(f"帳號:{account[0]}")
-    print(f"ID:{account[1]['ck_encust']}")
-
+# 定義註冊函式，用來向指定的 URL 發送請求
+async def sign_in_account(session, account, m_promo_no, dt_promo_no, gift_code):
     headers = {
         'User-Agent': 'MOMOSHOP',
         'Content-Type': 'application/json;charset=utf-8',
@@ -60,39 +30,47 @@ def sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results):
         'Referer': 'https://www.momoshop.com.tw/',
     }
 
+    # 使用指定帳號的 cookies
     cookies = account[1]
 
-    json_data_lottery = {
+    # 請求的 JSON 資料
+    data = {
         "m_promo_no": m_promo_no,
         "dt_promo_no": dt_promo_no,
         "gift_code": gift_code,
-        'doAction': 'lottery',
+        "doAction": "reg"
     }
-    
-    try:
-        response = requests.post('https://event.momoshop.com.tw/promoMechReg.PROMO', cookies=cookies, headers=headers, json=json_data_lottery)
-        print(response.text)
-        results.append(f"帳號:{account[0]} 抽獎結果: {response.text}")
-    except requests.exceptions.RequestException as e:
-        error_message = f"帳號:{account[0]} 抽獎動作失敗: {e}"
-        print(error_message)
-        results.append(error_message)
-    
-    print("-----------------------")
 
-def main():
-    # 確保 gift_code_array 不為空
-    if not gift_code_array:
-        gift_code_array.append("default_code")  # 預設禮品碼
+    # 發送 POST 請求並返回響應
+    async with session.post('https://event.momoshop.com.tw/promoMechReg.PROMO', headers=headers, json=data, cookies=cookies) as response:
+        return await response.text()
 
-    # 開始執行 momo 抽獎
-    results = []
-    for account, dt_promo_no, gift_code in product(accounts, dt_promo_no_array, gift_code_array):
-        sign_in_account(account, m_promo_no, dt_promo_no, gift_code, results)
+# 定義帶有延遲的執行函式，每個帳號最多執行 50 次
+async def execute_with_delay(account, m_promo_no, dt_promo_no_array, gift_code_array, max_attempts=1):
+    attempt_count = 0  # 記錄已執行的次數
+    async with aiohttp.ClientSession() as session:
+        while attempt_count < max_attempts:  # 當次數少於 max_attempts 時，繼續執行
+            for dt_promo_no, gift_code in zip(dt_promo_no_array, gift_code_array):
+                result = await sign_in_account(session, account, m_promo_no, dt_promo_no, gift_code)
+                print(f"{account[0]} 回傳值: {result}")
+                attempt_count += 1  # 增加已執行次數
+                if attempt_count >= max_attempts:  # 若達到最大執行次數，結束迴圈
+                    print(f"{account[0]} 已達到最大執行次數 {max_attempts}")
+                    return
+                await asyncio.sleep(0.02)  # 延遲下一次請求
 
-    # 傳送抽獎結果
-    all_results_message = "\n".join(results)
-    send_long_message(all_results_message)
+# 主函式，用於啟動多個帳號的註冊程序
+async def main():
+    # 為每個帳號創建一個執行任務
+    tasks = [execute_with_delay(account, m_promo_no, dt_promo_no_array, gift_code_array) for account in accounts]
+    await asyncio.gather(*tasks)  # 並行執行所有任務
 
+# 程式入口，計算總執行時間
 if __name__ == "__main__":
-    main()
+    start_time = time.time()
+    try:
+        asyncio.get_event_loop().run_until_complete(main())
+    except KeyboardInterrupt:
+        print("程序已停止")
+    end_time = time.time()
+    print(f"Total execution time: {end_time - start_time} seconds")

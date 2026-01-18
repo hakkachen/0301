@@ -19,9 +19,9 @@ accounts = [
 ]
 
 # 活動編號與禮品碼
-m_promo_no = "M25090100105"
-dt_promo_no_array = ["D25090100004"]
-gift_code_array = ["gift4"]
+m_promo_no = "M26010100179"
+dt_promo_no_array = ["D26010100003"]
+gift_code_array = ["gift003"]
 
 def send_telegram_message(message):
     """發送訊息到 Telegram"""
